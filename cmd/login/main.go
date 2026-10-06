@@ -17,7 +17,7 @@ func main() {
 
 	http.Handle("/login", loginProxy)
 
-	fmt.Println("Gateway running on :8080")
+	fmt.Println("Login running on :9001")
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":9001", nil))
 }

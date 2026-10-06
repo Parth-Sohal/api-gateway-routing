@@ -2,22 +2,28 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+
+	"api-gateway-routing/internal/proxy"
 )
 
-func hello(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello from API Gateway")
-}
-
-func users(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Users endpoint")
-}
-
 func main() {
-	http.HandleFunc("/", hello)
-	http.HandleFunc("/users", users)
 
-	fmt.Println("Gateway running on port 8080")
+    loginProxy, err := proxy.NewProxy("http://localhost:9001")
+    if err != nil {
+        log.Fatal(err)
+    }
 
-	http.ListenAndServe(":8080", nil)
+    userProxy, err := proxy.NewProxy("http://localhost:9002")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    http.Handle("/login", loginProxy)
+    http.Handle("/users", userProxy)
+
+    fmt.Println("Gateway running on :8080")
+
+    log.Fatal(http.ListenAndServe(":8080", nil))
 }

@@ -2,22 +2,17 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
-
-	"api-gateway-routing/internal/proxy"
 )
 
+func login(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintln(w, "login handled by User Backend")
+}
+
 func main() {
+    http.HandleFunc("/login", login)
 
-	loginProxy, err := proxy.NewProxy("http://localhost:9000")
-	if err != nil {
-		log.Fatal(err)
-	}
+    fmt.Println("Login running on :9001")
 
-	http.Handle("/login", loginProxy)
-
-	fmt.Println("Login running on :9001")
-
-	log.Fatal(http.ListenAndServe(":9001", nil))
+    http.ListenAndServe(":9001", nil)
 }

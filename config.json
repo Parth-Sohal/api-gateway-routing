@@ -1,0 +1,6 @@
+{
+  "routes": [
+    { "path": "/orders", "upstream": "http://localhost:9000" },
+    { "path": "/users",  "upstream": "http://localhost:9001" }
+  ]
+}

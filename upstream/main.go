@@ -10,6 +10,7 @@ func main() {
 
 	fmt.Println("Orders service (upstream) starting on http://localhost:9000")
 	err := http.ListenAndServe(":9000", nil)
+
 	if err != nil {
 		fmt.Println("Upstream failed:", err)
 	}

@@ -6,7 +6,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // HTTP client used by our gateway to communicate with backend services.
@@ -29,11 +32,18 @@ func main() {
 		return
 	}
 
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	defer rdb.Close()
+
+	rl := NewRateLimiter(rdb, 10, 2) // capacity 10, refill 2 tokens/sec
+
 	// Register every proxy route.
 	for _, route := range routes {
 
 		// Create a handler that remembers this route's upstream.
-		handler := makeProxyHandler(route.Upstream)
+		handler := makeProxyHandler(route.Upstream, rl)
 
 		// Register the handler with Go's HTTP router.
 		http.HandleFunc(route.Path, handler)
@@ -53,6 +63,7 @@ func main() {
 	fmt.Println("Gateway starting on http://localhost:8081")
 
 	err = http.ListenAndServe(":8081", nil)
+
 	if err != nil {
 		fmt.Println("Gateway failed:", err)
 	}
@@ -84,58 +95,45 @@ func loadRoutes(path string) ([]Route, error) {
 
 // ---------------- PROXY ----------------
 
-func makeProxyHandler(upstream string) http.HandlerFunc {
-
+func makeProxyHandler(upstream string, rl *RateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// Create a new request for the backend.
-		outReq, err := http.NewRequest(
-			r.Method,
-			upstream+r.URL.RequestURI(),
-			r.Body,
-		)
+		// --- Rate limiting ---
+		clientIP := strings.Split(r.RemoteAddr, ":")[0]
 
-		if err != nil {
-			http.Error(
-				w,
-				"bad request",
-				http.StatusBadRequest,
-			)
+		if !rl.Allow(clientIP) {
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
 
-		// Copy request headers from client → backend.
+		// --- Proxy ---
+		outReq, err := http.NewRequest(r.Method, upstream+r.URL.RequestURI(), r.Body)
+		if err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+
 		for name, values := range r.Header {
 			for _, value := range values {
 				outReq.Header.Add(name, value)
 			}
 		}
 
-		// Send request to backend.
 		resp, err := httpClient.Do(outReq)
-
 		if err != nil {
-			http.Error(
-				w,
-				"upstream unreachable",
-				http.StatusBadGateway,
-			)
+			http.Error(w, "upstream unreachable", http.StatusBadGateway)
 			return
 		}
-
 		defer resp.Body.Close()
 
-		// Copy response headers from backend → client.
 		for name, values := range resp.Header {
 			for _, value := range values {
 				w.Header().Add(name, value)
 			}
 		}
 
-		// Send backend's status code to client.
 		w.WriteHeader(resp.StatusCode)
-
-		// Send backend's response body to client.
 		io.Copy(w, resp.Body)
 	}
 }

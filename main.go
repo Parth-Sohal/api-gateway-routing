@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -39,11 +40,31 @@ func main() {
 
 	rl := NewRateLimiter(rdb, 10, 2) // capacity 10, refill 2 tokens/sec
 
+	// One circuit breaker per upstream URL, shared across routes.
+	// circkuit breaker
+	breakers := make(map[string]*CircuitBreaker)
+	var breakerMu sync.Mutex
+
+	getBreaker := func(upstream string) *CircuitBreaker {
+		breakerMu.Lock()
+		defer breakerMu.Unlock()
+
+		cb, ok := breakers[upstream]
+		if !ok {
+			// 5 consecutive failures → OPEN
+			// 3 successful probes → CLOSED
+			// 30-second cooldown
+			cb = NewCircuitBreaker(5, 3, 30*time.Second)
+			breakers[upstream] = cb
+		}
+		return cb
+	}
+
 	// Register every proxy route.
 	for _, route := range routes {
 
 		// Create a handler that remembers this route's upstream.
-		handler := makeProxyHandler(route.Upstream, rl)
+		handler := makeProxyHandler(route.Upstream, rl, getBreaker(route.Upstream))
 
 		// Register the handler with Go's HTTP router.
 		http.HandleFunc(route.Path, handler)
@@ -95,7 +116,7 @@ func loadRoutes(path string) ([]Route, error) {
 
 // ---------------- PROXY ----------------
 
-func makeProxyHandler(upstream string, rl *RateLimiter) http.HandlerFunc {
+func makeProxyHandler(upstream string, rl *RateLimiter, cb *CircuitBreaker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// --- Rate limiting ---
@@ -107,9 +128,17 @@ func makeProxyHandler(upstream string, rl *RateLimiter) http.HandlerFunc {
 			return
 		}
 
-		// --- Proxy ---
+		// --- Circuit breaker: is the upstream allowed right now? ---
+		permit, allowed := cb.Allow()
+		if !allowed {
+			http.Error(w, "service temporarily unavailable (circuit open)", http.StatusServiceUnavailable)
+			return
+		}
+
+		// --- Build outbound request ---
 		outReq, err := http.NewRequest(r.Method, upstream+r.URL.RequestURI(), r.Body)
 		if err != nil {
+			cb.RecordFailure(permit)
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
@@ -120,13 +149,24 @@ func makeProxyHandler(upstream string, rl *RateLimiter) http.HandlerFunc {
 			}
 		}
 
+		// --- Forward to upstream ---
 		resp, err := httpClient.Do(outReq)
 		if err != nil {
+			// Network error → count as failure
+			cb.RecordFailure(permit)
 			http.Error(w, "upstream unreachable", http.StatusBadGateway)
 			return
 		}
 		defer resp.Body.Close()
 
+		// --- Record outcome based on upstream status ---
+		if resp.StatusCode >= 500 {
+			cb.RecordFailure(permit)
+		} else {
+			cb.RecordSuccess(permit)
+		}
+
+		// --- Copy response back to client ---
 		for name, values := range resp.Header {
 			for _, value := range values {
 				w.Header().Add(name, value)

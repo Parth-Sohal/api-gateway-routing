@@ -1,0 +1,147 @@
+# Local development configuration. Run the three mock upstreams first:
+#
+#   go run ./cmd/mockupstream -addr 127.0.0.1:9001 -name mock-1
+#   go run ./cmd/mockupstream -addr 127.0.0.1:9002 -name mock-2
+#   go run ./cmd/mockupstream -addr 127.0.0.1:9003 -name mock-3
+#
+# Then:
+#
+#   $env:GATEWAY_JWT_SECRET = "development-only-secret"
+#   $env:GATEWAY_ADMIN_TOKEN = "development-admin-token"
+#   go run ./cmd/gateway -config configs/gateway.yaml
+#
+# Redis is required for the distributed rate-limit demo (see deploy/); without
+# it requests still succeed but limits fall back locally (fail_open default).
+
+server:
+  addr: ":8080"
+  max_concurrent_requests: 4096
+  trusted_proxies:
+    - 127.0.0.1/32
+    - ::1/128
+
+admin:
+  enabled: true
+  addr: "127.0.0.1:9090"
+  token_env: GATEWAY_ADMIN_TOKEN
+
+metrics:
+  enabled: true
+  addr: "127.0.0.1:9100"
+  path: /metrics
+
+redis:
+  addr: "localhost:6379"
+  pool_size: 64
+  min_idle_conns: 8
+  op_timeout: 20ms
+  fail_open: true
+
+auth:
+  jwt:
+    algorithms: [HS256]
+    hs256_secret_env: GATEWAY_JWT_SECRET
+    leeway: 5s
+  api_keys:
+    # Demo key: gw_demo_demo-secret-123
+    # Mint another hash with: go run ./cmd/token -hash-secret <secret>
+    - id: demo
+      owner: demo-owner
+      hash: 264c5c83f07d30c7ccc1083d7e416705272eafa1fc15167e09bed57b7697faed
+      scopes: [users:read, users:write]
+      roles: [developer]
+
+log:
+  level: info
+  format: json
+  access_log: true
+
+upstreams:
+  - name: users
+    balancer: least_conn
+    targets:
+      - url: http://127.0.0.1:9001
+      - url: http://127.0.0.1:9002
+      - url: http://127.0.0.1:9003
+    health_check:
+      enabled: true
+      path: /healthz
+      interval: 5s
+      timeout: 1s
+      healthy_threshold: 2
+      unhealthy_threshold: 3
+    breaker:
+      enabled: true
+      failure_threshold: 5
+      failure_ratio: 0.5
+      min_requests: 20
+      window: 10s
+      buckets: 10
+      open_timeout: 5s
+      half_open_max_probes: 3
+      half_open_successes: 2
+      count_500: true
+    retry:
+      enabled: true
+      max_attempts: 3
+      on: [connection_error, 502, 503, 504]
+      methods: [GET, HEAD, PUT, DELETE, OPTIONS]
+      base_backoff: 50ms
+      max_backoff: 500ms
+      body_buffer_bytes: 65536
+      budget_percent: 10
+
+  - name: orders
+    balancer: weighted_round_robin
+    targets:
+      - url: http://127.0.0.1:9001
+        weight: 2
+      - url: http://127.0.0.1:9002
+        weight: 1
+    health_check:
+      enabled: true
+      path: /healthz
+      interval: 5s
+      timeout: 1s
+    retry:
+      enabled: true
+      max_attempts: 2
+      on: [connection_error, 503]
+      methods: [GET, HEAD, PUT, DELETE, OPTIONS]
+
+routes:
+  - name: users
+    match:
+      path_prefix: /api/users
+    strip_prefix: /api
+    upstream: users
+    timeout: 30s
+    auth:
+      required: true
+      methods: [jwt, api_key]
+      match: any
+      scopes: [users:read]
+    rate_limit:
+      capacity: 100
+      refill_per_sec: 50
+      key: ip
+      fail_open: true
+
+  - name: orders
+    match:
+      path_prefix: /api/orders
+    strip_prefix: /api
+    upstream: orders
+    timeout: 15s
+    auth:
+      required: true
+      methods: [jwt]
+      scopes: [orders:read]
+
+  - name: public
+    match:
+      path_prefix: /public
+    strip_prefix: /public
+    upstream: users
+    timeout: 10s
+    max_body_bytes: 262144

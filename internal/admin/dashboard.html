@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Gateway · Operations</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b1020;
+    --panel: #121a2e;
+    --panel-2: #0f1628;
+    --line: #223052;
+    --text: #e8eefc;
+    --muted: #8fa0c4;
+    --accent: #5b8cff;
+    --ok: #35d399;
+    --warn: #ffb020;
+    --bad: #ff5d6c;
+    --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: radial-gradient(1200px 600px at 10% -10%, #1a2b55 0, var(--bg) 55%);
+    color: var(--text); font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px; }
+  .topbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 18px; letter-spacing: .2px; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), #9a6bff);
+    display: grid; place-items: center; font-size: 17px; box-shadow: var(--shadow); }
+  .spacer { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel-2); font-size: 12px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.ok .dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+  .pill.bad .dot { background: var(--bad); box-shadow: 0 0 10px var(--bad); }
+  button {
+    font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 9px; padding: 8px 14px; cursor: pointer; transition: border-color .15s, transform .05s;
+  }
+  button:hover { border-color: var(--accent); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.ghost { background: transparent; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line);
+    border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+  .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .7px; }
+  .card .value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+  .card .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .panel { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: var(--shadow); margin-bottom: 18px; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .panel-head h2 { font-size: 14px; margin: 0; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+  .panel-body { padding: 0; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 640px; }
+  th, td { text-align: left; padding: 10px 16px; border-bottom: 1px solid rgba(34, 48, 82, .6); vertical-align: top; }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace; font-size: 12px; }
+  .muted { color: var(--muted); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: rgba(53, 211, 153, .35); background: rgba(53, 211, 153, .1); }
+  .badge.bad { color: var(--bad); border-color: rgba(255, 93, 108, .35); background: rgba(255, 93, 108, .1); }
+  .badge.warn { color: var(--warn); border-color: rgba(255, 176, 32, .35); background: rgba(255, 176, 32, .1); }
+  .sub { color: var(--muted); font-size: 12px; }
+  .err { display: none; margin-bottom: 16px; padding: 12px 14px; border-radius: 10px;
+    border: 1px solid rgba(255, 93, 108, .4); background: rgba(255, 93, 108, .1); color: #ffd5d9; }
+  .err.show { display: block; }
+  .toast { position: fixed; right: 22px; bottom: 22px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow); opacity: 0; transform: translateY(8px);
+    transition: opacity .2s, transform .2s; pointer-events: none; max-width: 420px; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.bad { border-color: rgba(255, 93, 108, .5); }
+  footer { color: var(--muted); font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; padding: 6px 0 30px; }
+  .login { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px;
+    background: rgba(4, 8, 18, .78); backdrop-filter: blur(4px); z-index: 10; }
+  .login.hidden, .app.hidden { display: none; }
+  .login-card { width: min(440px, 100%); background: linear-gradient(180deg, #16203a, #10182b);
+    border: 1px solid var(--line); border-radius: 16px; padding: 26px; box-shadow: var(--shadow); }
+  .login-card h1 { font-size: 20px; margin: 12px 0 4px; }
+  .login-card p { color: var(--muted); margin: 0 0 18px; }
+  .login-card label { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase;
+    letter-spacing: .7px; margin-bottom: 6px; }
+  input[type=password] { width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line);
+    background: #0a1020; color: var(--text); font: inherit; }
+  input:focus { outline: 2px solid rgba(91, 140, 255, .45); outline-offset: 1px; }
+  .login-actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; }
+  .login-error { color: var(--bad); font-size: 12px; min-height: 18px; margin-top: 12px; }
+  @media (max-width: 700px) { .wrap { padding: 16px; } .topbar { gap: 10px; } }
+</style>
+</head>
+<body>
+<div class="login" id="login">
+  <form class="login-card" id="loginForm" autocomplete="off">
+    <div class="logo">G</div>
+    <h1>Gateway operations</h1>
+    <p>Enter the admin bearer token to inspect routes, targets, breakers and reload configuration.</p>
+    <label for="token">Admin token</label>
+    <input id="token" type="password" placeholder="Bearer token" autofocus spellcheck="false">
+    <div class="login-actions">
+      <button class="primary" type="submit">Connect</button>
+      <span class="login-error" id="loginError"></span>
+    </div>
+    <p style="margin-top:18px;font-size:12px">The token stays in this browser tab (sessionStorage) and is never embedded in the page.</p>
+  </form>
+</div>
+
+<div class="app hidden" id="app">
+  <div class="wrap">
+    <header class="topbar">
+      <div class="brand"><span class="logo">G</span> API Gateway</div>
+      <span class="pill" id="readyPill"><span class="dot"></span><span id="readyText">checking</span></span>
+      <span class="pill" id="versionPill">version –</span>
+      <span class="pill" id="uptimePill">uptime –</span>
+      <div class="spacer"></div>
+      <button class="primary" id="reloadBtn" type="button">Reload config</button>
+      <button class="ghost" id="logoutBtn" type="button">Sign out</button>
+    </header>
+
+    <div class="err" id="errorBox"></div>
+
+    <section class="cards">
+      <div class="card"><div class="label">Routes</div><div class="value" id="routeCount">–</div>
+        <div class="hint" id="routeHint">configured</div></div>
+      <div class="card"><div class="label">Upstreams</div><div class="value" id="upstreamCount">–</div>
+        <div class="hint" id="upstreamHint">pools</div></div>
+      <div class="card"><div class="label">Healthy targets</div><div class="value" id="healthyCount">–</div>
+        <div class="hint" id="healthyHint">of –</div></div>
+      <div class="card"><div class="label">Open breakers</div><div class="value" id="openCount">–</div>
+        <div class="hint" id="limitHint">rate limiter –</div></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Upstreams</h2><span class="sub" id="upstreamUpdated"></span></div>
+      <div class="panel-body"><table>
+        <thead><tr><th>Upstream</th><th>Target</th><th>Health</th><th>Inflight</th><th>Failures</th><th>Breaker</th><th>Last error</th></tr></thead>
+        <tbody id="upstreamBody"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+      </table></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Routes</h2><span class="sub" id="routeUpdated"></span></div>
+      <div class="panel-body"><table>
+        <thead><tr><th>Route</th><th>Match</th><th>Upstream</th><th>Auth</th><th>Rate limit</th><th>Timeout</th></tr></thead>
+        <tbody id="routeBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+      </table></div>
+    </section>
+
+    <footer>
+      <span id="refreshNote">Auto-refresh every 5s.</span>
+      <span id="reloadNote"></span>
+    </footer>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TOKEN_KEY = "gatewayAdminToken";
+  var state = { token: "", timer: null, loading: false };
+  var el = function (id) { return document.getElementById(id); };
+
+  function text(node, value) {
+    node.textContent = value === undefined || value === null || value === "" ? "–" : String(value);
+  }
+
+  function badge(label, kind) {
+    var span = document.createElement("span");
+    span.className = "badge" + (kind ? " " + kind : "");
+    span.textContent = label;
+    return span;
+  }
+
+  function showLogin(message) {
+    el("login").classList.remove("hidden");
+    el("app").classList.add("hidden");
+    el("loginError").textContent = message || "";
+    el("token").focus();
+  }
+
+  function showApp() {
+    el("login").classList.add("hidden");
+    el("app").classList.remove("hidden");
+  }
+
+  function showError(message) {
+    var box = el("errorBox");
+    if (!message) { box.classList.remove("show"); box.textContent = ""; return; }
+    box.textContent = message;
+    box.classList.add("show");
+  }
+
+  var toastTimer = null;
+  function toast(message, bad) {
+    var node = el("toast");
+    node.textContent = message;
+    node.className = "toast show" + (bad ? " bad" : "");
+    if (toastTimer) { clearTimeout(toastTimer); }
+    toastTimer = setTimeout(function () { node.className = "toast"; }, 3200);
+  }
+
+  function authHeaders() {
+    return { "Authorization": "Bearer " + state.token, "Accept": "application/json" };
+  }
+
+  function parseError(payload, fallback) {
+    if (payload && payload.error && payload.error.message) { return payload.error.message; }
+    return fallback;
+  }
+
+  function request(path, options, isLogin) {
+    options = options || {};
+    options.headers = Object.assign({}, options.headers || {}, authHeaders());
+    return fetch(path, options).then(function (resp) {
+      var type = resp.headers.get("Content-Type") || "";
+      var parsed = type.indexOf("application/json") >= 0 ? resp.json() : resp.text();
+      return parsed.then(function (body) {
+        if (resp.ok) { return body; }
+        var err = new Error(parseError(body, "Request failed (" + resp.status + ")"));
+        err.status = resp.status;
+        throw err;
+      });
+    }).catch(function (err) {
+      if (isLogin && err.status === 401) {
+        state.token = "";
+        sessionStorage.removeItem(TOKEN_KEY);
+        showLogin("Token rejected.");
+      }
+      throw err;
+    });
+  }
+
+  function uptime(seconds) {
+    seconds = Math.max(0, Math.floor(seconds || 0));
+    var d = Math.floor(seconds / 86400);
+    var h = Math.floor((seconds % 86400) / 3600);
+    var m = Math.floor((seconds % 3600) / 60);
+    var s = seconds % 60;
+    if (d > 0) { return d + "d " + h + "h"; }
+    if (h > 0) { return h + "h " + m + "m"; }
+    if (m > 0) { return m + "m " + s + "s"; }
+    return s + "s";
+  }
+
+  function breakerKind(state) {
+    if (state === "open") { return "bad"; }
+    if (state === "half_open") { return "warn"; }
+    return "ok";
+  }
+
+  function renderOverview(data) {
+    showError("");
+    text(el("routeCount"), (data.routes || []).length);
+    text(el("upstreamCount"), (data.upstreams || []).length);
+
+    var targets = 0, healthy = 0, open = 0;
+    (data.upstreams || []).forEach(function (up) {
+      (up.targets || []).forEach(function (t) {
+        targets += 1;
+        if (t.available) { healthy += 1; }
+      });
+      if (up.breaker && up.breaker.state === "open") { open += 1; }
+    });
+    text(el("healthyCount"), healthy);
+    text(el("healthyHint"), "of " + targets + " targets");
+    text(el("openCount"), open);
+    text(el("limitHint"), "rate limiter " + (data.rate_limiter || "disabled"));
+
+    var pill = el("readyPill");
+    pill.className = "pill " + (data.ready ? "ok" : "bad");
+    text(el("readyText"), data.ready ? "ready" : ("not ready" + (data.readiness_reason ? ": " + data.readiness_reason : "")));
+    text(el("versionPill"), "version " + (data.version || "dev"));
+    text(el("uptimePill"), "uptime " + uptime(data.uptime_seconds));
+    text(el("refreshNote"), "Auto-refresh every 5s · last update " + new Date().toLocaleTimeString());
+    text(el("reloadNote"), "Reloads: " + (data.reloads || 0) +
+      (data.last_reload ? " · last " + new Date(data.last_reload).toLocaleString() : ""));
+    if (data.last_reload_error) {
+      showError("Last reload failed: " + data.last_reload_error);
+    }
+
+    renderUpstreams(data.upstreams || []);
+    renderRoutes(data.routes || []);
+  }
+
+  function renderUpstreams(upstreams) {
+    var body = el("upstreamBody");
+    body.textContent = "";
+    if (!upstreams.length) {
+      appendEmpty(body, 7, "No upstreams configured.");
+      return;
+    }
+    upstreams.forEach(function (up) {
+      var targets = up.targets || [];
+      if (!targets.length) {
+        var tr = document.createElement("tr");
+        tr.appendChild(cell(up.name, "mono"));
+        tr.appendChild(cell("–", "mono muted"));
+        tr.appendChild(cell(badge("no targets", "bad")));
+        tr.appendChild(cell("–"));
+        tr.appendChild(cell("–"));
+        tr.appendChild(cell(breakerCell(up.breaker)));
+        tr.appendChild(cell("–", "muted"));
+        body.appendChild(tr);
+        return;
+      }
+      targets.forEach(function (t, index) {
+        var tr = document.createElement("tr");
+        var nameCell = cell(index === 0 ? up.name : "", "mono");
+        if (index === 0) { nameCell.appendChild(subText(up.balancer || "round_robin")); }
+        tr.appendChild(nameCell);
+        tr.appendChild(cell(t.url, "mono"));
+        tr.appendChild(cell(t.available ? badge("healthy", "ok") : badge("unhealthy", "bad")));
+        tr.appendChild(cell(String(t.inflight || 0)));
+        tr.appendChild(cell(String(t.consecutive_failures || 0)));
+        tr.appendChild(cell(breakerCell(up.breaker)));
+        tr.appendChild(cell(t.last_error || "–", "muted mono"));
+        body.appendChild(tr);
+      });
+    });
+  }
+
+  function breakerCell(breaker) {
+    if (!breaker) { return badge("disabled"); }
+    var wrap = document.createElement("span");
+    wrap.appendChild(badge(breaker.state || "unknown", breakerKind(breaker.state)));
+    var detail = document.createElement("span");
+    detail.className = "sub";
+    detail.textContent = " ratio " + Math.round((breaker.failure_ratio || 0) * 100) + "% · " +
+      (breaker.window_failures || 0) + "/" + (breaker.window_requests || 0);
+    wrap.appendChild(detail);
+    return wrap;
+  }
+
+  function renderRoutes(routes) {
+    var body = el("routeBody");
+    body.textContent = "";
+    if (!routes.length) {
+      appendEmpty(body, 6, "No routes configured.");
+      return;
+    }
+    routes.forEach(function (r) {
+      var tr = document.createElement("tr");
+      tr.appendChild(cell(r.name, "mono"));
+      var match = cell((r.host ? r.host : "*") + (r.path_prefix || "/"), "mono");
+      if (r.methods && r.methods.length) { match.appendChild(subText(r.methods.join(", "))); }
+      tr.appendChild(match);
+      tr.appendChild(cell(r.upstream, "mono"));
+      var auth = r.auth_required ? badge("required") : badge("public");
+      if (r.auth_required && ((r.scopes || []).length || (r.roles || []).length)) {
+        var detail = document.createElement("span");
+        detail.className = "sub";
+        detail.textContent = " " + (r.scopes || []).concat(r.roles || []).join(", ");
+        auth.appendChild(detail);
+      }
+      tr.appendChild(cell(auth));
+      if (r.rate_limit) {
+        var limit = badge(r.rate_limit.capacity + " burst");
+        var rl = document.createElement("span");
+        rl.className = "sub";
+        rl.textContent = " " + r.rate_limit.refill_per_sec + "/s · " + r.rate_limit.key +
+          (r.rate_limit.fail_open ? " · fail-open" : " · fail-closed");
+        limit.appendChild(rl);
+        tr.appendChild(cell(limit));
+      } else {
+        tr.appendChild(cell("–", "muted"));
+      }
+      tr.appendChild(cell(r.timeout || "–", "mono"));
+      body.appendChild(tr);
+    });
+  }
+
+  function cell(value, className) {
+    var td = document.createElement("td");
+    if (value && typeof value === "object" && value.nodeType) {
+      td.appendChild(value);
+    } else {
+      td.textContent = value === undefined || value === null ? "–" : String(value);
+    }
+    if (className) { td.className = className; }
+    return td;
+  }
+
+  function subText(value) {
+    var div = document.createElement("div");
+    div.className = "sub";
+    div.textContent = value;
+    return div;
+  }
+
+  function appendEmpty(body, columns, message) {
+    var tr = document.createElement("tr");
+    var td = document.createElement("td");
+    td.colSpan = columns;
+    td.className = "muted";
+    td.textContent = message;
+    tr.appendChild(td);
+    body.appendChild(tr);
+  }
+
+  function load(isLogin) {
+    if (state.loading || !state.token) { return Promise.resolve(); }
+    state.loading = true;
+    return request("/admin/api/overview", {}, isLogin).then(function (data) {
+      renderOverview(data);
+      showApp();
+    }).catch(function (err) {
+      if (err.status === 401) { return; }
+      showError(err.message || "Unable to load overview.");
+    }).finally(function () {
+      state.loading = false;
+    });
+  }
+
+  function schedule() {
+    if (state.timer) { clearInterval(state.timer); }
+    state.timer = setInterval(function () { load(false); }, 5000);
+  }
+
+  function reload() {
+    var button = el("reloadBtn");
+    button.disabled = true;
+    button.textContent = "Reloading…";
+    request("/admin/reload", { method: "POST" }).then(function (data) {
+      toast("Configuration reloaded" + (data && data.reloads ? " (" + data.reloads + " total)" : "") + ".");
+      return load(false);
+    }).catch(function (err) {
+      toast(err.message || "Reload failed.", true);
+    }).finally(function () {
+      button.disabled = false;
+      button.textContent = "Reload config";
+    });
+  }
+
+  el("loginForm").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var token = el("token").value.trim();
+    if (!token) { el("loginError").textContent = "Enter a token."; return; }
+    state.token = token;
+    el("loginError").textContent = "";
+    load(true).then(function () {
+      if (!state.token) { return; }
+      sessionStorage.setItem(TOKEN_KEY, token);
+      showApp();
+      schedule();
+      el("token").value = "";
+      toast("Connected.");
+    }).catch(function (err) {
+      if (err.status === 401) { return; }
+      el("loginError").textContent = err.message || "Connection failed.";
+    });
+  });
+
+  el("reloadBtn").addEventListener("click", reload);
+  el("logoutBtn").addEventListener("click", function () {
+    state.token = "";
+    sessionStorage.removeItem(TOKEN_KEY);
+    if (state.timer) { clearInterval(state.timer); state.timer = null; }
+    showLogin("");
+    el("loginError").textContent = "";
+  });
+
+  var saved = sessionStorage.getItem(TOKEN_KEY);
+  if (saved) {
+    state.token = saved;
+    load(true).then(function () {
+      if (state.token) { showApp(); schedule(); }
+    }).catch(function () { showLogin("Session expired. Enter the admin token again."); });
+  } else {
+    showLogin("");
+  }
+})();
+</script>
+</body>
+</html>

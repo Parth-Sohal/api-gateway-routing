@@ -12,7 +12,7 @@ import (
 )
 
 // HeaderRequestID is the inbound and outbound correlation header.
-const HeaderRequestID = "X-Request-Id"
+const HeaderRequestID = httpx.HeaderRequestID
 
 // Middleware wraps a handler.
 type Middleware func(http.Handler) http.Handler

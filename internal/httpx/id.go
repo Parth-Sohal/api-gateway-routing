@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// HeaderRequestID is the inbound and outbound correlation header.
+const HeaderRequestID = "X-Request-Id"
+
 // crockford is the ULID alphabet.
 var crockford = base32.NewEncoding("0123456789ABCDEFGHJKMNPQRSTVWXYZ").WithPadding(base32.NoPadding)
 

@@ -1,0 +1,31 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+*.exe~
+*.test
+*.prof
+
+# Test and coverage output
+coverage.out
+coverage.html
+*.cover
+*.out
+bench/results/*
+!bench/results/.gitkeep
+
+# Local secrets and environment
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docker / Grafana runtime data
+deploy/grafana/data/
+deploy/grafana/plugins/

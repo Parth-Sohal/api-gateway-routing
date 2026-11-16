@@ -401,16 +401,16 @@ func execute(ctx context.Context, cfg *config) (*summaryJSON, error) {
 
 	runCtx := ctx
 	var cancel context.CancelFunc
-	if cfg.duration > 0 {
-		runCtx, cancel = context.WithTimeout(ctx, cfg.duration)
-		defer cancel()
-	}
 
 	l := &loader{cfg: cfg, client: client, interval: rateInterval(cfg.rate), drain: maxDrainBytes}
 	jobs := make(chan struct{}, cfg.concurrency)
 	aggregate := newStats()
-	start := time.Now()
 
+	// Start every worker and wait until each one is ready before the duration
+	// clock starts. Otherwise process startup (TLS setup, scheduler delays)
+	// counts against a short -duration and can produce a zero-request run.
+	gate := make(chan struct{})
+	ready := make(chan struct{}, cfg.concurrency)
 	var wg sync.WaitGroup
 	results := make([]*stats, cfg.concurrency)
 	for i := 0; i < cfg.concurrency; i++ {
@@ -419,9 +419,21 @@ func execute(ctx context.Context, cfg *config) (*summaryJSON, error) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			ready <- struct{}{}
+			<-gate
 			l.worker(runCtx, jobs, local)
 		}()
 	}
+	for i := 0; i < cfg.concurrency; i++ {
+		<-ready
+	}
+
+	if cfg.duration > 0 {
+		runCtx, cancel = context.WithTimeout(ctx, cfg.duration)
+		defer cancel()
+	}
+	start := time.Now()
+	close(gate)
 	l.dispatch(runCtx, jobs)
 	wg.Wait()
 	elapsed := time.Since(start)

@@ -98,7 +98,7 @@ Middleware order is intentional:
 - **Recovery** innermost: a panic is converted to a 500 envelope and a metric; the
   access log still records it.
 
-The concurrency semaphore rejects with `503 overloaded` and a short `Retry-After` instead
+The concurrency semaphore rejects with `503 gateway_overloaded` and a short `Retry-After` instead
 of queueing without bound. The limit is `server.max_concurrent_requests`; zero disables it.
 
 Path normalization rejects NUL/control characters, malformed percent-encoding,
@@ -298,13 +298,13 @@ Failures map to the stable envelope:
 
 | Condition | Status | Code |
 |---|---|---|
-| no target available | 503 | `service_unavailable` |
-| breaker open | 503 | `circuit_open` |
+| no target available | 503 | `no_healthy_targets` |
+| breaker open | 503 | `upstream_unavailable` |
 | upstream timeout | 504 | `gateway_timeout` |
 | connection/DNS/TLS error | 502 | `bad_gateway` |
 | request body too large | 413 | `payload_too_large` |
 | limiter unavailable (strict) | 503 | `limiter_unavailable` |
-| overloaded | 503 | `overloaded` |
+| overloaded | 503 | `gateway_overloaded` |
 
 Internal error strings, upstream URLs and credentials are logged, never returned.
 
@@ -366,12 +366,12 @@ never logged.
 | Redis down, fail-open | limiter error | local fallback; `failopen` metric |
 | Redis down, strict | limiter error | 503; readiness false |
 | One target down | active/passive health | balancer skips it; retry may hit another |
-| All targets down | health | 503 `service_unavailable` |
-| Upstream 5xx burst | breaker | open; 503 `circuit_open` with `Retry-After` |
+| All targets down | health | 503 `no_healthy_targets` |
+| Upstream 5xx burst | breaker | open; 503 `upstream_unavailable` with `Retry-After` |
 | Upstream slow | route/transport timeout | 504; retry if budget allows |
 | Client disconnects | context cancellation | upstream attempt cancelled; no retry |
 | Config invalid on reload | parse/validate | old snapshot keeps serving; reload failure metric |
-| Gateway overloaded | concurrency semaphore | 503 `overloaded` |
+| Gateway overloaded | concurrency semaphore | 503 `gateway_overloaded` |
 | Gateway panic | recovery middleware | 500 envelope; panic metric/log |
 | Shutdown signal | listener close | readiness false; drain in-flight; exit |
 

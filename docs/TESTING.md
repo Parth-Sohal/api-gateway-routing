@@ -142,8 +142,8 @@ Every feature should have at least one test for each applicable row:
 | retry budget exhausted | original response returned, no retry |
 | upstream connection error | 502 or retry to a different target |
 | upstream timeout | 504 |
-| breaker open | 503 `circuit_open` with `Retry-After` |
-| all targets unhealthy | 503 `service_unavailable` |
+| breaker open | 503 `upstream_unavailable` with `Retry-After` |
+| all targets unhealthy | 503 `no_healthy_targets` |
 | client cancellation | upstream attempt cancelled; no retry |
 | panic in handler | 500 envelope, access log still emitted |
 | shutdown with in-flight request | readiness false first, request completes, exit clean |

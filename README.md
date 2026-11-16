@@ -178,7 +178,7 @@ routes:
     max_body_bytes: 1048576
 ```
 
-Four configurations are included:
+Included configurations and observability assets:
 
 | File | Purpose |
 |---|---|

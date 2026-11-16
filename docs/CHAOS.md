@@ -158,7 +158,7 @@ done
 
 Expected:
 
-- all targets unhealthy → requests fail with `503 service_unavailable`;
+- all targets unhealthy → requests fail with `503 no_healthy_targets`;
 - retries stop being useful and are bounded by the per-request attempt count and the
   global retry budget;
 - `gateway_target_healthy == 0` for every target, and the
@@ -166,8 +166,9 @@ Expected:
 - the gateway stays alive, serves readiness (Redis is still up), and recovers without a
   restart when the proxies are re-enabled.
 
-This experiment distinguishes “upstream pool exhausted” (503) from “breaker open”
-(503 with `circuit_open`) and “gateway overloaded” (503 with `overloaded`). Always inspect
+This experiment distinguishes “upstream pool exhausted” (`503 no_healthy_targets`) from
+“breaker open” (`503 upstream_unavailable`) and “gateway overloaded”
+(`503 gateway_overloaded`). Always inspect
 the error `code` in the response body, not only the status.
 
 ## 7. Experiment E — 5xx storm and breaker
@@ -186,7 +187,7 @@ Expected:
 - 503 responses count as breaker failures (`count_500` is not required for 5xx other than
   500);
 - once the threshold/ratio trips, `gateway_breaker_state{upstream="users"}` becomes 2
-  (open) and requests fail fast with `503 circuit_open` plus `Retry-After`;
+  (open) and requests fail fast with `503 upstream_unavailable` plus `Retry-After`;
 - after `open_timeout: 5s`, up to three half-open probes are admitted; failures reopen
   the breaker, successes close it after two consecutive successes.
 

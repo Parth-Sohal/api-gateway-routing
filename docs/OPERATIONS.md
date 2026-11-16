@@ -271,7 +271,7 @@ Rules of thumb:
 | 401 with valid token | wrong issuer/audience/secret/expiry | decode the JWT; check `iss`, `aud`, `exp`, algorithm and leeway |
 | 403 with valid token | missing scope/role | compare token claims with `auth.scopes`/`auth.roles`; remember `match` semantics |
 | 429 immediately | tiny bucket or shared IP/header key | inspect limit headers; verify `key` and `header` |
-| all requests 503 `circuit_open` | breaker tripped | check upstream errors, `open_timeout`, breaker state; fix upstream then wait for half-open |
+| all requests 503 `upstream_unavailable` | breaker tripped | check upstream errors, `open_timeout`, breaker state; fix upstream then wait for half-open |
 | 503 `limiter_unavailable` | strict limit + Redis down | restore Redis or switch to fail-open; readiness should be false |
 | 502 | connection/DNS/TLS failure | check target URL reachability and logs |
 | 504 | timeout waiting for headers | increase route/transport timeout or fix upstream latency |

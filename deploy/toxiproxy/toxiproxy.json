@@ -1,0 +1,20 @@
+[
+  {
+    "name": "mock-a",
+    "listen": "0.0.0.0:8666",
+    "upstream": "mock-a:9001",
+    "enabled": true
+  },
+  {
+    "name": "mock-b",
+    "listen": "0.0.0.0:8667",
+    "upstream": "mock-b:9001",
+    "enabled": true
+  },
+  {
+    "name": "mock-c",
+    "listen": "0.0.0.0:8668",
+    "upstream": "mock-c:9001",
+    "enabled": true
+  }
+]

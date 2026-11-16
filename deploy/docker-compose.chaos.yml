@@ -1,0 +1,31 @@
+# Chaos overlay: routes every upstream through Toxiproxy so failures and
+# latency can be injected without stopping containers.
+#
+#   docker compose -f deploy/docker-compose.yml \
+#                  -f deploy/docker-compose.chaos.yml up --build -d
+#
+# Then, for example:
+#   curl -X POST http://localhost:8474/proxies/mock-a/toxics \
+#        -d '{"name":"latency","type":"latency","attributes":{"latency":500}}'
+#   curl -X DELETE http://localhost:8474/proxies/mock-a
+
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.11.0
+    command: ["-host", "0.0.0.0", "-config", "/config/toxiproxy.json"]
+    volumes:
+      - ./toxiproxy:/config:ro
+    ports:
+      - "8474:8474"
+    restart: unless-stopped
+    networks: [gateway]
+
+  gateway:
+    command: ["-config", "/app/configs/gateway.toxiproxy.yaml"]
+    volumes:
+      - ../configs/gateway.toxiproxy.yaml:/app/configs/gateway.toxiproxy.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      toxiproxy:
+        condition: service_started

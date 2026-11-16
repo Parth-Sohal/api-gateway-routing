@@ -1,0 +1,132 @@
+groups:
+  - name: gateway-availability
+    rules:
+      - alert: GatewayDown
+        expr: up{job="gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gateway metrics endpoint is down"
+          description: "Prometheus has failed to scrape the gateway for more than one minute."
+
+      - alert: GatewayConfigReloadFailed
+        expr: increase(gateway_config_reloads_total{result="failure"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Configuration reload failed"
+          description: "The gateway rejected a configuration reload and is still serving the previous snapshot."
+
+      - alert: GatewayNoSuccessfulReload
+        expr: time() - gateway_config_last_reload_success_timestamp_seconds > 86400
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "No successful config reload in 24h"
+          description: "The config watcher may not be receiving events, or reloads keep failing."
+
+  - name: gateway-traffic
+    rules:
+      - alert: GatewayHighErrorRate
+        expr: |
+          sum(rate(gateway_http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(gateway_http_requests_total[5m])), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5% of gateway responses are 5xx"
+          description: "5xx ratio is {{ $value | humanizePercentage }} over the last five minutes."
+
+      - alert: GatewayHighLatencyP99
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le) (rate(gateway_http_request_duration_seconds_bucket[5m]))
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway p99 latency above one second"
+          description: "p99 latency is {{ $value | humanizeDuration }}."
+
+      - alert: GatewayRateLimitedSpike
+        expr: sum(rate(gateway_ratelimit_decisions_total{decision="limited"}[5m])) > 25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate limiting is rejecting many requests"
+          description: "{{ $value | humanize }} requests per second are being limited."
+
+      - alert: GatewayAuthFailureSpike
+        expr: sum(rate(gateway_auth_failures_total[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Authentication failures are elevated"
+          description: "{{ $value | humanize }} authentication failures per second."
+
+      - alert: GatewayRetryRateHigh
+        expr: |
+          sum(rate(gateway_upstream_retries_total[5m]))
+          /
+          clamp_min(sum(rate(gateway_upstream_requests_total[5m])), 0.001)
+          > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 20% of upstream attempts are retries"
+          description: "Retry ratio is {{ $value | humanizePercentage }}."
+
+  - name: gateway-upstreams
+    rules:
+      - alert: GatewayTargetUnhealthy
+        expr: min by (upstream, target) (gateway_target_healthy) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Upstream target ejected"
+          description: "{{ $labels.upstream }} target {{ $labels.target }} has been unhealthy for two minutes."
+
+      - alert: GatewayBreakerOpen
+        expr: max by (upstream) (gateway_breaker_state) == 2
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker open"
+          description: "Breaker for {{ $labels.upstream }} is open; requests are failing fast."
+
+      - alert: GatewayAllTargetsDown
+        expr: |
+          max by (upstream) (gateway_target_healthy) == 0
+          and
+          count by (upstream) (gateway_target_healthy) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No healthy targets for an upstream"
+          description: "Every target in {{ $labels.upstream }} is unhealthy."
+
+      - alert: GatewayUpstreamServerErrors
+        expr: |
+          sum by (upstream) (rate(gateway_upstream_requests_total{outcome="server_error"}[5m]))
+          /
+          clamp_min(sum by (upstream) (rate(gateway_upstream_requests_total[5m])), 0.001)
+          > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Upstream {{ $labels.upstream }} is returning server errors"
+          description: "Server-error ratio is {{ $value | humanizePercentage }}."

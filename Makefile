@@ -3,7 +3,7 @@ BINARY ?= bin/gateway
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build fmt vet lint test test-race cover test-integration bench fuzz load chaos docker compose-up compose-down clean token mock
+.PHONY: all build fmt vet lint test test-race cover cover-gate test-integration bench fuzz load chaos docker compose-up compose-down clean token mock
 
 all: fmt vet test
 
@@ -28,6 +28,9 @@ test-race:
 cover:
 	go test -coverprofile=coverage.out ./internal/...
 	go tool cover -func=coverage.out | tail -n 20
+
+cover-gate:
+	bash scripts/coverage-gate.sh
 
 test-integration:
 	go test -race -count=1 -run 'Integration|MultiInstance|Graceful' ./internal/...

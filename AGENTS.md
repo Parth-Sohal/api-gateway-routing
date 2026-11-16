@@ -26,7 +26,7 @@ dashboard. Correctness, observability and testability matter more than feature c
 
 ## Environment
 
-- Go 1.24+ (module declares `go 1.24.0`).
+- Go 1.26+ (module declares `go 1.26.0`).
 - Redis 6.2+ for integration tests and compose.
 - Docker 24+ for compose/chaos/load.
 - Windows or Linux for development; CI runs Linux.
@@ -92,6 +92,7 @@ make vet            # go vet ./...
 make test           # go test ./...
 make test-race      # go test -race ./...
 make cover          # coverage report per core package
+make cover-gate     # enforce the >=80% floor on mandated packages
 make test-integration
 make bench          # go test -bench . -benchmem ./...
 make load           # k6 via compose
